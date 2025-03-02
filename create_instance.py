@@ -11,7 +11,7 @@ def main():
 	
     image_id = 'ami-07d0cf3af28718ef8'
     instance_type = 't2.micro'
-    keypair_name = 'labsuser'
+    keypair_name = 'Imaran-key'
   
   
     try:
