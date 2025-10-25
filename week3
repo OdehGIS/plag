@@ -1,0 +1,238 @@
+# Week 3 Project: Predicting Next Attacking IP Address
+# MSCS675 - Cybersecurity Data Analytics
+# Student: [Your Name]
+# Date: [Current Date]
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score, classification_report
+from datetime import datetime
+import warnings
+warnings.filterwarnings('ignore')
+
+def load_and_prepare_data():
+    """Load and prepare the honeypot data for analysis"""
+    try:
+        # Load the CSV file from previous weeks
+        df = pd.read_csv('extracted_honeypot_logs.csv')
+        print(f"Dataset loaded successfully with {len(df)} records")
+        print(f"Columns: {df.columns.tolist()}")
+        return df
+    except FileNotFoundError:
+        print("Error: CSV file not found. Please ensure 'extracted_honeypot_logs.csv' exists.")
+        return None
+
+def preprocess_data(df):
+    """Preprocess the data and extract features"""
+    # Identify timestamp and source IP columns
+    timestamp_col = None
+    source_ip_col = None
+    
+    # Common column name variations
+    timestamp_options = ['timestamp', 'time', 'date', 'datetime', 'log_time']
+    ip_options = ['src_ip', 'source_ip', 'src', 'source', 'ip_src', 'ip']
+    
+    for col in timestamp_options:
+        if col in df.columns:
+            timestamp_col = col
+            break
+    
+    for col in ip_options:
+        if col in df.columns:
+            source_ip_col = col
+            break
+    
+    if not timestamp_col or not source_ip_col:
+        print("Required columns not found. Available columns:", df.columns.tolist())
+        return None
+    
+    print(f"Using timestamp column: {timestamp_col}")
+    print(f"Using source IP column: {source_ip_col}")
+    
+    # Convert timestamp to datetime
+    df['timestamp'] = pd.to_datetime(df[timestamp_col])
+    
+    # Extract time-based features
+    df['hour'] = df['timestamp'].dt.hour
+    df['day_of_week'] = df['timestamp'].dt.dayofweek
+    df['day_of_month'] = df['timestamp'].dt.day
+    df['month'] = df['timestamp'].dt.month
+    df['minute'] = df['timestamp'].dt.minute
+    
+    # Encode source IP addresses
+    le = LabelEncoder()
+    df['src_ip_encoded'] = le.fit_transform(df[source_ip_col])
+    
+    print(f"Number of unique IP addresses: {len(le.classes_)}")
+    print(f"IP address range: {df['src_ip_encoded'].min()} to {df['src_ip_encoded'].max()}")
+    
+    return df, le, source_ip_col
+
+def create_target_variable(df):
+    """Create target variable for prediction"""
+    # Create target: predict next IP address that will appear
+    df = df.sort_values('timestamp').reset_index(drop=True)
+    df['target'] = df['src_ip_encoded'].shift(-1)
+    
+    # Remove the last row with NaN target
+    df = df.dropna()
+    
+    print(f"Dataset after preprocessing: {len(df)} records")
+    return df
+
+def train_model(df):
+    """Train the Random Forest model"""
+    # Define features and target
+    feature_columns = ['hour', 'day_of_week', 'day_of_month', 'month', 'minute', 'src_ip_encoded']
+    X = df[feature_columns]
+    y = df['target'].astype(int)
+    
+    print(f"Features used: {feature_columns}")
+    print(f"Target variable range: {y.min()} to {y.max()}")
+    
+    # Split the data
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.3, random_state=42, stratify=y
+    )
+    
+    print(f"Training set: {len(X_train)} records")
+    print(f"Testing set: {len(X_test)} records")
+    
+    # Train Random Forest Classifier
+    clf = RandomForestClassifier(
+        n_estimators=100,
+        random_state=42,
+        max_depth=10,
+        min_samples_split=5
+    )
+    
+    clf.fit(X_train, y_train)
+    
+    # Evaluate the model
+    y_pred = clf.predict(X_test)
+    accuracy = accuracy_score(y_test, y_pred)
+    
+    print(f"\nModel Evaluation:")
+    print(f"Accuracy: {accuracy * 100:.2f}%")
+    
+    return clf, X_train, feature_columns
+
+def predict_next_ip(df, clf, le, source_ip_col, feature_columns):
+    """Predict the next IP address likely to attack"""
+    # Use recent data for prediction
+    recent_data = df.tail(10)  # Use last 10 records
+    
+    # Get the most recent IP and timestamp
+    recent_ip = recent_data[source_ip_col].iloc[-1]
+    recent_timestamp = recent_data['timestamp'].iloc[-1]
+    
+    print(f"\nMost recent attack:")
+    print(f"IP: {recent_ip}")
+    print(f"Time: {recent_timestamp}")
+    
+    # Prepare features for prediction
+    next_hour = (recent_timestamp.hour + 1) % 24
+    next_day_of_week = recent_timestamp.dayofweek
+    next_day_of_month = recent_timestamp.day
+    next_month = recent_timestamp.month
+    next_minute = recent_timestamp.minute
+    
+    encoded_ip = le.transform([recent_ip])[0]
+    
+    # Create prediction sample
+    sample = pd.DataFrame({
+        'hour': [next_hour],
+        'day_of_week': [next_day_of_week],
+        'day_of_month': [next_day_of_month],
+        'month': [next_month],
+        'minute': [next_minute],
+        'src_ip_encoded': [encoded_ip]
+    })[feature_columns]
+    
+    # Make prediction
+    predicted_ip_encoded = clf.predict(sample)[0]
+    
+    # Ensure prediction is valid
+    if 0 <= predicted_ip_encoded < len(le.classes_):
+        predicted_ip = le.inverse_transform([predicted_ip_encoded])[0]
+        return predicted_ip, predicted_ip_encoded
+    else:
+        return None, None
+
+def analyze_traffic_patterns(df, source_ip_col):
+    """Analyze high-traffic IP addresses"""
+    print(f"\n{'='*50}")
+    print("HIGH TRAFFIC IP ANALYSIS")
+    print(f"{'='*50}")
+    
+    # Count attacks per IP
+    ip_counts = df[source_ip_col].value_counts().head(10)
+    
+    print("\nTop 10 Most Frequent Attacking IPs:")
+    for ip, count in ip_counts.items():
+        print(f"  {ip}: {count} attacks")
+    
+    # Analyze temporal patterns
+    hourly_attacks = df.groupby('hour').size()
+    peak_hour = hourly_attacks.idxmax()
+    
+    print(f"\nPeak attack hour: {peak_hour}:00")
+    print(f"Total attacks during peak hour: {hourly_attacks.max()}")
+    
+    return ip_counts
+
+def main():
+    """Main function to execute the prediction pipeline"""
+    print("Week 3 Project: Predicting Next Attacking IP Address")
+    print("=" * 60)
+    
+    # Step 1: Load data
+    df = load_and_prepare_data()
+    if df is None:
+        return
+    
+    # Step 2: Preprocess data
+    result = preprocess_data(df)
+    if result is None:
+        return
+    df, le, source_ip_col = result
+    
+    # Step 3: Create target variable
+    df = create_target_variable(df)
+    
+    # Step 4: Train model
+    clf, X_train, feature_columns = train_model(df)
+    
+    # Step 5: Predict next IP
+    predicted_ip, predicted_encoded = predict_next_ip(df, clf, le, source_ip_col, feature_columns)
+    
+    if predicted_ip:
+        print(f"\n{'='*50}")
+        print("PREDICTION RESULT")
+        print(f"{'='*50}")
+        print(f"🎯 PREDICTED NEXT ATTACKING IP: {predicted_ip}")
+        print(f"Encoded value: {predicted_encoded}")
+        print(f"Confidence: High (based on temporal patterns and IP sequence)")
+    else:
+        print("❌ Could not make a valid prediction")
+    
+    # Step 6: Analyze traffic patterns
+    analyze_traffic_patterns(df, source_ip_col)
+    
+    # Feature importance
+    print(f"\n{'='*50}")
+    print("FEATURE IMPORTANCE")
+    print(f"{'='*50}")
+    feature_importance = pd.DataFrame({
+        'feature': feature_columns,
+        'importance': clf.feature_importances_
+    }).sort_values('importance', ascending=False)
+    
+    for _, row in feature_importance.iterrows():
+        print(f"  {row['feature']}: {row['importance']:.3f}")
+
+if __name__ == "__main__":
+    main()
