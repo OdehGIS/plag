@@ -1,0 +1,102 @@
+# =============================================================================
+# WEEK 3: PREDICTING NEXT ATTACKING IP (Add this cell to your Week 2 notebook)
+# =============================================================================
+
+print("🚀 WEEK 3: Building Prediction Model on Week 2 Features...")
+
+# Import additional libraries for Week 3
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import numpy as np
+
+# Prepare data for sequence prediction
+df_sorted = df.sort_values('timestamp_parsed').reset_index(drop=True)
+
+# Encode IP addresses for ML
+le_ip = LabelEncoder()
+df_sorted['src_ip_encoded'] = le_ip.fit_transform(df_sorted['src_ip'])
+
+# Create target: predict next IP that will appear
+df_sorted['next_ip_encoded'] = df_sorted['src_ip_encoded'].shift(-1)
+df_sorted = df_sorted.dropna(subset=['next_ip_encoded'])
+df_sorted['next_ip_encoded'] = df_sorted['next_ip_encoded'].astype(int)
+
+# Merge with Week 2 behavioral features
+df_enhanced = pd.merge(df_sorted, final_features, left_on='src_ip', right_on='ip', how='left')
+
+# Define features (temporal + behavioral)
+df_enhanced['hour'] = df_enhanced['timestamp_parsed'].dt.hour
+df_enhanced['minute'] = df_enhanced['timestamp_parsed'].dt.minute
+
+basic_features = ['hour', 'minute', 'src_ip_encoded']
+behavioral_features = [col for col in final_features.columns if col.endswith('_scaled') and col != 'ip']
+all_features = basic_features + behavioral_features
+
+X = df_enhanced[all_features].fillna(0)
+y = df_enhanced['next_ip_encoded']
+
+print(f"📊 Training on {len(X)} events, {len(le_ip.classes_)} unique IPs")
+print(f"🔧 Using {len(all_features)} features")
+
+# Train-test split and model training
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42, stratify=y)
+
+clf = RandomForestClassifier(n_estimators=100, random_state=42, class_weight='balanced')
+clf.fit(X_train, y_train)
+
+# Evaluate model
+y_pred = clf.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+
+# Make prediction on most recent event
+recent_data = df_enhanced.iloc[-1]
+sample_features = {f: [recent_data[f]] for f in all_features}
+sample_df = pd.DataFrame(sample_features)
+
+predicted_ip_encoded = clf.predict(sample_df)[0]
+probabilities = clf.predict_proba(sample_df)[0]
+confidence = probabilities[predicted_ip_encoded]
+
+# Get predicted IP
+predicted_ip = le_ip.inverse_transform([predicted_ip_encoded])[0] if 0 <= predicted_ip_encoded < len(le_ip.classes_) else "Unknown"
+
+# =============================================================================
+# WEEK 3 DELIVERABLES OUTPUT
+# =============================================================================
+
+print("\n" + "="*70)
+print("🎯 WEEK 3 PREDICTION RESULTS")
+print("="*70)
+print(f"PREDICTED NEXT ATTACKING IP: {predicted_ip}")
+print(f"MODEL ACCURACY: {accuracy * 100:.2f}%")
+print(f"PREDICTION CONFIDENCE: {confidence:.2%}")
+print(f"BASED ON: {len(df_enhanced)} historical events")
+print(f"UNIQUE IPs ANALYZED: {len(le_ip.classes_)}")
+print("="*70)
+
+# Feature importance
+feature_importance = pd.DataFrame({
+    'feature': all_features,
+    'importance': clf.feature_importances_
+}).sort_values('importance', ascending=False)
+
+print("\n🔝 TOP 5 MOST IMPORTANT FEATURES:")
+for i, (_, row) in enumerate(feature_importance.head().iterrows()):
+    print(f"  {i+1}. {row['feature']}: {row['importance']:.4f}")
+
+# Save prediction results
+results = {
+    'predicted_ip': predicted_ip,
+    'model_accuracy': accuracy,
+    'prediction_confidence': confidence,
+    'training_records': len(df_enhanced),
+    'unique_ips': len(le_ip.classes_)
+}
+
+results_df = pd.DataFrame([results])
+results_df.to_csv('week3_prediction_results.csv', index=False)
+print(f"\n💾 Results saved to 'week3_prediction_results.csv'")
+
+print("\n✅ WEEK 3 DELIVERABLES COMPLETE!")
+print("📸 Take screenshot of above output for submission")
